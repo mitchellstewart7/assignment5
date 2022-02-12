@@ -1,14 +1,20 @@
--- Mitchell Stewart
+-- Mitchell Stewart, Matthew Hotchkiss, Alex Vogt
 -- CS381 Julianne Coffman
--- 2/5/2022
--- Assignment 4
+-- 2/12/2022
+-- Assignment 5
 
 module StackLang where
-import Data.Maybe
-import Data.Either
+--import Data.Maybe
+--import Data.Either
 
 type Prog = [Cmd]
-type Stack = [Either Bool Int]
+
+data Val 
+    = I Int 
+    | B Bool
+    deriving Show
+
+type Stack = [Val]
 
 data Cmd
     = LDI Int
@@ -18,13 +24,16 @@ data Cmd
     | MULT
     | DUP
     | IFELSE Prog Prog
+    | DEC
+    | SWAP
+    | POP Int
     deriving Show
 
 -- define testing stack and some tests
 stack1::Stack
-stack1 = [Right 1, Right 3, Right 5, Right 7, Right 9]
+stack1 = [I 1, I 3, I 5, I 7, I 9]
 stack2::Stack
-stack2 = [Left True, Right 3]
+stack2 = [B True, I 3]
 test1 = [LDI 3, DUP, ADD, DUP, MULT]
 test2 = [LDB True, DUP, IFELSE [LDI 1] [LDI 0]]
 test3 = [LEQ]
@@ -45,17 +54,17 @@ run (x:xs) s = (semCmd x s) >>= run xs
 -- function that executes a command on a stack
 semCmd :: Cmd -> Stack -> Maybe Stack
 -- loads an integer onto the stack, return the stack with the new element at the front
-semCmd (LDI n) s = Just ((Right n):s)
+semCmd (LDI n) s = Just ((I n):s)
 -- loads a boolean onto the stack, return the stack with the new element at the front
-semCmd (LDB b) s = Just ((Left b):s)
+semCmd (LDB b) s = Just ((B b):s)
 -- if the command is add, add the two first elements and put them at the front of the tail
 -- if there aren't two elements at the front of the stack, this will not execute
 -- only runs on integers, so Right must go in front of inputs
-semCmd (ADD) ((Right x):(Right y):xs) = Just (Right (x+y):xs)
+semCmd (ADD) ((I x):(I y):xs) = Just (I (x+y):xs)
 -- if the command is multiply, multiply the two first elements and put them at the front of the tail
 -- if there aren't two elements at the front of the stack, this will not execute
 -- only runs on integers, so Right must go in front of inputs
-semCmd (MULT) ((Right x):(Right y):xs) = Just (Right (x*y):xs)
+semCmd (MULT) ((I x):(I y):xs) = Just (I (x*y):xs)
 -- if the command is duplicate, put the head of the stack into the stack twice
 -- if there is not an element in the stack this will not run
 -- runs on integers and booleans
@@ -63,14 +72,22 @@ semCmd (DUP) (x:xs) = Just (x:x:xs)
 -- if the command is LEQ, check if the first element is less than or equal to the second in the stack
 -- if it is, load true into the stack, otherwise load false
 -- first two elements must be integers
-semCmd (LEQ) ((Right x):(Right y):xs)
+semCmd (LEQ) ((I x):(I y):xs)
     | x <= y = semCmd (LDB True) xs
     | otherwise = semCmd (LDB False) xs
 -- if the command is IFELSE, check truth value of the first element
 -- if it's true, run the first passed in Prog, otherwise run the second
 -- first element must be a boolean
-semCmd (IFELSE p1 p2) ((Left x):xs)
+semCmd (IFELSE p1 p2) ((B x):xs)
     | x==True = run p1 xs
     | otherwise = run p2 xs
+
+semCmd (DEC) ((I x):xs) = Just ((I (x-1)):xs)
+
+semCmd (SWAP) (x:y:xs) = Just (y:x:xs)
+
+semCmd (POP k) [] = Just []
+semCmd (POP 0) s = Just s
+semCmd (POP k) (x:xs) = semCmd (POP (k-1)) xs
 -- catches any instance where performing a command is invalid and returns nothing
 semCmd _ _ = Nothing
