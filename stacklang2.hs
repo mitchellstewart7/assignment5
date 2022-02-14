@@ -47,8 +47,19 @@ test6 = [LDI 5, LDI 2, LEQ, IFELSE [LDI 10, DUP] [], ADD]
 test7 = [LDI 5, LDI 7, LEQ, IFELSE [LDI 10, DUP] [LDI 20, DUP], ADD]
 test8 = [LDI 1, LDI 2, LDI 3, LDI 4, LDI 5, ADD, ADD, ADD, ADD]
 
-run :: Prog -> Stack -> Type
-run p s = semStatTC p s
+intToVal :: [Int] -> Stack
+intToVal [] = []
+intToVal (x:xs) = ((I x):(intToVal xs))
+
+-- for integers, adds to list
+-- for booleans, adds 0 for false and 1 for true
+valToInt :: Stack -> [Int]
+valToInt [] = []
+valToInt ((I x):xs) = (x:(valToInt xs))
+valToInt ((B x):xs) = ((fromEnum x):(valToInt xs))
+
+run :: Prog -> [Int] -> Type
+run p s = semStatTC p (intToVal s)
 
 --old code below, with the new functions added into semCmd
 -------------------------------------------------------------------------------
@@ -111,8 +122,8 @@ rankC (LDB b) = (0,1)
 rankC (LEQ) = (2,1)
 rankC (ADD) = (2,1)
 rankC (MULT) = (2,1)
+-- no implementation for IFELSE as it is calculated differently (see rank function)
 rankC (DUP) = (1,2)
-rankC (IFELSE p1 p2) = (0,0) --temp value for IFELSE until other functions implemented
 rankC (DEC) = (1,1)
 rankC (SWAP) = (2,2)
 rankC (POP k) = (k,0)
@@ -123,6 +134,10 @@ rankP (x:xs) r = (rank x r) >>= rankP xs
 
 
 rank :: Cmd -> Rank -> Maybe Rank
+rank (IFELSE p1 p2) r
+    | ((rankP p1 (r-1)) == Nothing || (rankP p2 (r-1)) == Nothing) = Nothing
+    | fromJust (rankP p1 (r-1)) <= fromJust (rankP p2 (r-1)) = (rankP p1 (r-1))
+    | otherwise = (rankP p2 (r-1))
 rank c r
     | checkCmdRank (rankC c) r /= -100 = Just (r - checkCmdRank (rankC c) r)
     | otherwise = Nothing
@@ -133,7 +148,7 @@ checkCmdRank (x,y) r
     | otherwise = -100
 
 data Type
-    = A Stack
+    = A [Int]
     | Int
     | Bool
     | TypeError
@@ -154,7 +169,8 @@ tc (ADD) (x:y:xs)
 tc (MULT) (x:y:xs)
     | tcVal x == Int && tcVal y == Int = Int
 tc (DUP) (x:xs) = tcVal x
-tc (IFELSE p1 p2) s = TypeError --placeholder until implementation
+tc (IFELSE p1 p2) (x:xs)
+    | tcVal x == Bool = Bool
 tc (DEC) (x:xs)
     | tcVal x == Int = Int
 tc (SWAP) s = Int --doesn't matter the types being swapped
@@ -162,7 +178,7 @@ tc (POP k) s = Int --doesn't matter the types being popped
 tc _ _ = TypeError
 
 semStatTC :: Prog -> Stack -> Type
-semStatTC [] s = A s
+semStatTC [] s = A (valToInt s)
 semStatTC (x:xs) s
     | rankP (x:xs) (length s) == Nothing = RankError
     | tc x s == TypeError = TypeError
