@@ -149,38 +149,14 @@ checkCmdRank (x,y) r
 
 data Type
     = A [Int]
-    | Int
-    | Bool
     | TypeError
     | RankError
     deriving (Eq,Show)
-
-tcVal :: Val -> Type
-tcVal (I n) = Int
-tcVal (B b) = Bool
-
-tc :: Cmd -> Stack -> Type
-tc (LDI n) s = Int
-tc (LDB b) s = Bool
-tc (LEQ) (x:y:xs)
-    | tcVal x == Int && tcVal y == Int = Int
-tc (ADD) (x:y:xs)
-    | tcVal x == Int && tcVal y == Int = Int
-tc (MULT) (x:y:xs)
-    | tcVal x == Int && tcVal y == Int = Int
-tc (DUP) (x:xs) = tcVal x
-tc (IFELSE p1 p2) (x:xs)
-    | tcVal x == Bool = Bool
-tc (DEC) (x:xs)
-    | tcVal x == Int = Int
-tc (SWAP) s = Int --doesn't matter the types being swapped
-tc (POP k) s = Int --doesn't matter the types being popped
-tc _ _ = TypeError
 
 semStatTC :: Prog -> Stack -> Type
 semStatTC [] s = A (valToInt s)
 semStatTC (x:xs) s
     | rankP (x:xs) (length s) == Nothing = RankError
-    | tc x s == TypeError = TypeError
+    | semCmd x s == Nothing = TypeError
     | otherwise = semStatTC xs (fromJust (semCmd x s))
 
